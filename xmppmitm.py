@@ -57,7 +57,7 @@ def dotarget(clientsock,target,name,credblob):
 			print pkt
 			raise Exception("Didn't receive STARTTLS <proceed>")
 	except Exception as e:
-		print e
+		print "closing socket:", e
 		targetsock.close()
 		return
 	print '*switching to TLS*'
@@ -74,7 +74,6 @@ def dotarget(clientsock,target,name,credblob):
 		pkt = sslsock.recv(BUFSIZE)
 		if pkt == '':
 			raise Exception("Didn't receive hostname response [TLS]")
-		print pkt			
 		
 		# Receive Features
 		pkt = sslsock.recv(BUFSIZE)
@@ -88,7 +87,10 @@ def dotarget(clientsock,target,name,credblob):
 		pkt = sslsock.recv(BUFSIZE)
 		if 'success' not in pkt:
 			print pkt
-			raise Exception("Bad SASL negotiation or credentials [TLS]")		
+			raise Exception("Bad SASL negotiation or credentials [TLS]")
+		
+		# Send client Auth==OK
+		clientsock.send(pkt)
 
 		# Switch to relay mode
 		sslsock.settimeout(1.0)		
@@ -99,16 +101,16 @@ def dotarget(clientsock,target,name,credblob):
 				p = clientsock.recv(BUFSIZE)
 				print "C->S",p
 				sslsock.send(p)
-			except socket.timeout:
+			except socket.error:
 				pass		
 			try:
 				p = sslsock.recv(BUFSIZE)
 				print "S->C",p
 				clientsock.send(p)
-			except socket.timeout:
+			except socket.error:
 				pass
 	except Exception as e:
-		print e
+		print "closing SSL socket:", e
 		sslsock.close()
 
 def child(sock,target):
@@ -139,7 +141,7 @@ def child(sock,target):
 			print "Client doesn't like PLAIN or non-TLS"
 		sock.close()
 	except Exception as e:
-		print e
+		print "closing client socket:",e
 		sock.close()
 
 if __name__=='__main__': 
