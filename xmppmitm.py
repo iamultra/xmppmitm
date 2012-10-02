@@ -14,6 +14,7 @@ The Plan:
 * We connect to server, give server name
 * Server sends us features=STARTTLS
 * We do STARTTLS, send creds to server
+* Tell client creds worked
 * Relay!
 '''
 
@@ -60,7 +61,7 @@ def dotarget(clientsock,target,name,credblob):
 		print "closing socket:", e
 		targetsock.close()
 		return
-	print '*switching to TLS*'
+	print 'server connection is switching to TLS'
 	try:
 		sslsock = ssl.wrap_socket(targetsock,suppress_ragged_eofs=False)
 		
@@ -86,7 +87,7 @@ def dotarget(clientsock,target,name,credblob):
 		# Receive Auth==OK
 		pkt = sslsock.recv(BUFSIZE)
 		if 'success' not in pkt:
-			print pkt
+			print "DEBUG, bad auth response: ",pkt
 			raise Exception("Bad SASL negotiation or credentials [TLS]")
 		
 		# Send client Auth==OK
