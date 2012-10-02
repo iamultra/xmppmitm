@@ -101,14 +101,16 @@ def dotarget(clientsock,target,name,credblob):
 				p = clientsock.recv(BUFSIZE)
 				print "C->S",p
 				sslsock.send(p)
-			except socket.error:
-				pass		
+			except socket.error as e:
+				if "timed out" not in str(e):
+					raise e	
 			try:
 				p = sslsock.recv(BUFSIZE)
 				print "S->C",p
 				clientsock.send(p)
-			except socket.error:
-				pass
+			except socket.error as e:
+				if "timed out" not in str(e):
+					raise e
 	except Exception as e:
 		print "closing SSL socket:", e
 		sslsock.close()
