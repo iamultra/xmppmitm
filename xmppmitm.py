@@ -139,12 +139,12 @@ def child(sock,target,certfile='',keyfile=''):
 		# Receive XML Header
 		pkt = sock.recv(BUFSIZE)
 		if pkt == '':
-			raise Exception("Didn't receive XML Header")					
+			raise Exception("Didn't receive XML Header")
 		
 		# Receive Server Name
 		pkt = sock.recv(BUFSIZE)
 		if pkt == '':
-			raise Exception("Didn't receive server name")			
+			raise Exception("Didn't receive server name")
 		m = re.search("to='([\w\.]+)'",pkt)
 		name = m.group(1)
 		print 'hostname:', name
@@ -159,7 +159,7 @@ def child(sock,target,certfile='',keyfile=''):
 			# Receive PLAIN auth
 			authblock = sock.recv(BUFSIZE)
 			if authblock != '':
-				credblob = re.search('>(\w+)</auth>',authblock).group(1)
+				credblob = re.search('>([\w=]+)</auth>',authblock).group(1)
 				creds = base64.b64decode(credblob).split('\x00')
 				print "credentials:",creds
 				dotarget(sock,target,name,credblob)
