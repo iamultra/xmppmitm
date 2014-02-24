@@ -195,7 +195,10 @@ def child(sock,target,certfile='',keyfile=''):
 				# Receive PLAIN auth
 				authblock = sslsock.recv(BUFSIZE)
 				if authblock != '':
-					credblob = re.search('>(\w+)</auth>',authblock).group(1)
+					match = re.search('>(\w+)</auth>',authblock)
+					if not match:
+						raise Exception("Didn't receive auth block, PLAIN auth not supported?")
+					credblob = match.group(1)
 					creds = base64.b64decode(credblob).split('\x00')
 					print "credentials:",creds
 					dotarget(sslsock,target,name,credblob)
